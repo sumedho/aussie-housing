@@ -1,0 +1,108 @@
+---
+title: "Australian Insolvancy Map"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+This short tutorial shows how to create a map with three different layers and popup content, which can be toggled with a control. The map shows total insolvancy data in Australia for the last two years. 
+
+The insolvancy data consists of three different columns, the total number of insolvancies in the two year period, the number of insolvancies per week and the number of insolvancies per ten thousand population. This data is joined to the shapefile data based on the SA3 code (Aust government local area code at S3 level). 
+
+#### Load and bind data
+A shapefile for australia is loaded and data is joined based on the SA3 CODE. The original shapefile was 45Mb, so too large for viewing on a webpage. The original data needs to be simplified to reduce the file size.  
+
+Using <http://www.mapshaper.org/>, the shape file can be quickly reduced to less than 1 Mb with only a small loss in detail (for such a large area). This worked much better than the simplify function in QGis which crashed with the larger states (too much data to simplify). 
+
+```{r, message=FALSE}
+# Load the required libraries
+library(tmap)
+library(leaflet)
+
+# Read in the shapefile
+ausmap = read_shape(file="data/SA3_2011_AUST.shp")
+
+# Read in the involvancy data from csv
+insolvancy <- read.csv("data/insolvancy.csv", stringsAsFactors=FALSE)
+
+# Join data based on ASGS code SA3 districts
+ausmap <- append_data(ausmap,insolvancy,key.shp="SA3_CODE11",key.data="SA3_CODE11")
+```
+
+#### Create Colour Palettes
+Three colour palettes are created, one for each set of data. This will allow the colour to be toggled later in the code.
+```{r, colour}
+# Colour palette for interactive map
+colperweek<- colorNumeric(palette = "Blues", domain=ausmap$perweek)
+coltotal<- colorNumeric(palette = "Reds", domain=ausmap$total)
+colper10k<- colorNumeric(palette = "Greens", domain=ausmap$per10k)
+```
+
+#### Create Popup Content
+THree different popup contents are created based on the three types of data. The different popups will be toggled in the final map depending on which set of polygons is displayed.
+```{r, content}
+# Popup content for total number of insolvancies
+contenttotal <- paste0("<strong>Area: </strong>", 
+                 ausmap@data$SA3_NAME11, 
+                 "<br><strong>Total: </strong>", 
+                 ausmap@data$total
+)
+
+# Popup content for number of insolvancies per week
+contentperweek <- paste0("<strong>Area: </strong>", 
+                        ausmap@data$SA3_NAME11,
+                        "<br><strong>Number per week: </strong>", 
+                        ausmap@data$perweek
+)
+
+# Popup content for number of insolvancies per 10,000 18+ population
+contentper10k <- paste0("<strong>Area: </strong>", 
+                        ausmap@data$SA3_NAME11, 
+                        "<br><strong>Number per 10k: </strong>", 
+                        ausmap@data$per10k
+)
+
+```
+
+#### Create Final Map
+The final map is constructed.
+```{r finalmap}
+m<-leaflet(ausmap) %>%
+  
+  # Add Open Streetmap background  
+  addProviderTiles("CartoDB.Positron") %>%
+  
+  # Add first polygon layer with popup and colour  
+  addPolygons(stroke=FALSE, 
+              smoothFactor = 0.2,
+              fillOpacity = .7, 
+              popup=contenttotal, #Display the total when clicking on a polygon
+              group="Total",
+              color= ~coltotal(ausmap@data$total)
+  )  %>%
+# Add second polygon layer with popup and colour
+addPolygons(stroke=FALSE, 
+            smoothFactor = 0.2,
+            fillOpacity = .7, 
+            popup=contentper10k, #Display the number per 10k when clicking on a polygon
+            group="Number per 10k",
+            color= ~colper10k(ausmap@data$per10k)
+)  %>%
+# Add third polygon layer with popup and colour
+addPolygons(stroke=FALSE, 
+            smoothFactor = 0.2,
+            fillOpacity = .7, 
+            popup=contentperweek, #Display the content per week when clicking on a polygon
+            group="Number per week",
+            color= ~colperweek(ausmap@data$perweek)
+)  %>%
+
+  # Create the layer controls.
+addLayersControl(
+    baseGroups=c("Total", "Number per 10k", "Number per week"),
+    position = "bottomleft",
+    options = layersControlOptions(collapsed = FALSE)
+) 
+m
+```

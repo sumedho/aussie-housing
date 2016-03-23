@@ -25,7 +25,7 @@ library(reshape2)
 The data is read from the csv file. It has a number of columns, but the ones used in this tutorial are date, owner and investor. These are the quartely date, the number of loans to owner occupiers and number of loans to investors respectively.
 
 ``` r
-ams <- read.csv("adi_monthly_stats.csv", stringsAsFactors=FALSE)
+ams <- read.csv("data/adi_monthly_stats.csv", stringsAsFactors=FALSE)
 str(ams)
 ```
 
